@@ -18,9 +18,10 @@ function App() {
     setResult('');
 
     try {
-      // Use environment variable if available, fallback to localhost for dev
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-      const response = await fetch(`${apiUrl}/transcript?link=${encodeURIComponent(url)}`);
+      // In production (EC2), Nginx serves the app so relative /api path works.
+      // For local dev, set VITE_API_URL=http://127.0.0.1:8000 in frontend/.env.local
+      const apiBase = import.meta.env.VITE_API_URL ?? '/api';
+      const response = await fetch(`${apiBase}/transcript?link=${encodeURIComponent(url)}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch from server');

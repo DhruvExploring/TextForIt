@@ -17,6 +17,14 @@ echo "[1/6] Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3 python3-venv python3-pip git curl nginx
 
+# Install Node.js 20 (works on x86 and ARM64)
+if ! command -v node &> /dev/null; then
+    echo "Installing Node.js 20..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
+fi
+echo "Node version: $(node -v)"
+
 # ── Step 2: Setup Backend ──────────────────────────
 echo ""
 echo "[2/6] Setting up Backend..."
@@ -98,7 +106,7 @@ server {
 
     # Proxy API requests to FastAPI backend
     location /api/ {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:8000/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
