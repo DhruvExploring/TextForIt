@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from logic import get_yt_transcript, get_llm_response
+from logic import get_llm_response
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
 app = FastAPI()
 
 app.add_middleware(
@@ -15,10 +16,10 @@ app.add_middleware(
 )
 
 @app.get("/transcript")
-def read_root(link:str):
+def read_root(link: str):
     try:
-        return get_llm_response(get_yt_transcript(link))
+        return get_llm_response(link)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return "Something went wrong,Please paste the link from video url"
+        return "Something went wrong. Please paste a valid public YouTube URL."
