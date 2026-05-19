@@ -18,8 +18,7 @@ function App() {
     setResult('');
 
     try {
-      // In production (EC2), Nginx serves the app so relative /api path works.
-      // For local dev, set VITE_API_URL=http://127.0.0.1:8000 in frontend/.env.local
+      // Relative /api path routes through Nginx in production; override via VITE_API_URL for local dev
       const apiBase = import.meta.env.VITE_API_URL ?? '/api';
       const response = await fetch(`${apiBase}/transcript?link=${encodeURIComponent(url)}`);
       
@@ -42,20 +41,18 @@ function App() {
     }
   };
 
-  // Basic function to render text with paragraphs (since it's a book chapter)
+  /** Renders Gemini markdown output: headings, quoted lines, and paragraphs. */
   const formatText = (text) => {
     return text.split('\n').map((paragraph, index) => {
       if (!paragraph.trim()) return null;
-      
-      // Check if it looks like a heading
+
       if (paragraph.startsWith('#')) {
         const level = (paragraph.match(/^#+/) || [''])[0].length;
         const textContent = paragraph.replace(/^#+\s*/, '');
         const HeadingTag = `h${Math.min(level, 6)}`;
         return <HeadingTag key={index}>{textContent}</HeadingTag>;
       }
-      
-      // Check if the text is wrapped in quotes
+
       if (paragraph.startsWith('"') && paragraph.endsWith('"')) {
         return <p key={index}><em>{paragraph}</em></p>;
       }

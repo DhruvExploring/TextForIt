@@ -1,73 +1,54 @@
 #!/bin/bash
-
-# ================================================
-# TextForIt — EC2 Production Script
-# Replaces local run.sh for EC2 Ubuntu 22.04
-# ================================================
+# TextForIt — EC2 deployment script (Ubuntu 22.04, ARM64)
 
 set -e
 
 echo "================================================="
-echo "   TextForIt EC2 Setup Starting..."
+echo "   TextForIt Deploying..."
 echo "================================================="
 
-# ── Step 1: System Update ──────────────────────────
-echo ""
+# ── System packages ────────────────────────────────
 echo "[1/6] Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3 python3-venv python3-pip git curl nginx
 
-# Install Node.js 20 (works on x86 and ARM64)
 if ! command -v node &> /dev/null; then
-    echo "Installing Node.js 20..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt install -y nodejs
 fi
-echo "Node version: $(node -v)"
 
-# ── Step 2: Setup Backend ──────────────────────────
-echo ""
-echo "[2/6] Setting up Backend..."
+# ── Backend ────────────────────────────────────────
+echo "[2/6] Setting up backend..."
 cd backend
 
 if [ ! -d ".venv" ]; then
-    echo "Creating virtual environment..."
     python3 -m venv .venv
 fi
 
-echo "Activating virtual environment..."
 source .venv/bin/activate
-
-echo "Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install --upgrade pip -q
+pip install -r requirements.txt -q
 
 cd ..
 
-# ── Step 3: Setup Frontend Build ───────────────────
-echo ""
-echo "[3/6] Building React Frontend..."
+# ── Frontend ───────────────────────────────────────
+echo "[3/6] Building frontend..."
 cd frontend
 
 if [ ! -d "node_modules" ]; then
-    echo "Installing Node dependencies..."
     npm install
 fi
 
-echo "Building for production..."
 npm run build
 
-# Allow Nginx (runs as www-data) to traverse the home directory.
-# Without this, it gets Permission denied (13) even though files are readable.
+# Nginx (www-data) needs execute on the home dir to traverse into frontend/dist
 sudo chmod o+x /home/ubuntu
 
 cd ..
 
-# ── Step 4: Setup systemd Service ─────────────────
-echo ""
-echo "[4/6] Creating systemd service..."
+# ── systemd service ────────────────────────────────
+echo "[4/6] Configuring systemd service..."
 
-# Get current directory for absolute paths
 PROJECT_DIR=$(pwd)
 
 sudo bash -c "cat > /etc/systemd/system/textforit.service << EOF
@@ -92,25 +73,20 @@ sudo systemctl daemon-reload
 sudo systemctl enable textforit
 sudo systemctl start textforit
 
-# ── Step 5: Setup Nginx ────────────────────────────
-echo ""
+# ── Nginx ──────────────────────────────────────────
 echo "[5/6] Configuring Nginx..."
 
-# Use sudo tee so the heredoc runs in the current shell (allowing ${PROJECT_DIR}
-# to expand) while nginx variables like $host are safely escaped with backslash.
 sudo tee /etc/nginx/sites-available/textforit > /dev/null << EOF
 server {
     listen 80;
     server_name _;
 
-    # Serve React frontend static files
     location / {
         root ${PROJECT_DIR}/frontend/dist;
         index index.html;
         try_files \$uri \$uri/ /index.html;
     }
 
-    # Proxy API requests to FastAPI backend
     location /api/ {
         proxy_pass http://127.0.0.1:8000/;
         proxy_set_header Host \$host;
@@ -125,34 +101,29 @@ sudo ln -sf /etc/nginx/sites-available/textforit /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl enable nginx && sudo systemctl restart nginx
 
-# ── Step 6: Check .env ─────────────────────────────
-echo ""
-echo "[6/6] Checking environment variables..."
+# ── Environment ────────────────────────────────────
+echo "[6/6] Checking environment..."
 
 if [ ! -f "backend/.env" ]; then
-    echo "WARNING: No .env file found! Creating a template..."
     cat > backend/.env << EOF
 GOOGLE_API_KEY=your_gemini_api_key_here
 EOF
-    echo "  --> Edit it now: nano backend/.env"
-    echo "  --> Then restart: sudo systemctl restart textforit"
+    echo "WARNING: Created .env template — set GOOGLE_API_KEY then restart:"
+    echo "  nano backend/.env && sudo systemctl restart textforit"
 else
-    echo "OK: .env file found"
     sudo systemctl restart textforit
 fi
 
 # ── Done ───────────────────────────────────────────
+PUBLIC_IP=$(curl -s ifconfig.me)
 echo ""
 echo "================================================="
 echo "   TextForIt is Live!"
 echo "================================================="
+echo "  App:     http://${PUBLIC_IP}"
+echo "  API:     http://${PUBLIC_IP}/api"
 echo ""
-echo "  App URL:      http://$(curl -s ifconfig.me)"
-echo "  Backend API:  http://$(curl -s ifconfig.me)/api"
-echo ""
-echo "Useful commands:"
-echo "  Check status:   sudo systemctl status textforit"
-echo "  Live logs:      sudo journalctl -u textforit -f"
-echo "  Restart:        sudo systemctl restart textforit"
-echo "  Edit env:       nano backend/.env"
+echo "  Status:  sudo systemctl status textforit"
+echo "  Logs:    sudo journalctl -u textforit -f"
+echo "  Restart: sudo systemctl restart textforit"
 echo ""

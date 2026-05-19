@@ -1,20 +1,20 @@
 def extract_video_id(link: str) -> str:
+    """Extract YouTube video ID from short (youtu.be) or full watch URLs."""
     path = link.split("//")[-1]
     if "youtu.be/" in path:
         return path.split("youtu.be/")[1].split("?")[0]
     elif "v=" in path:
         return path.split("v=")[1].split("&")[0]
-    else:
-        raise ValueError(f"Cannot extract video ID from: {link}")
+    raise ValueError(f"Cannot extract video ID from: {link}")
 
 
 def get_llm_response(link: str) -> str:
+    """Pass the YouTube video directly to Gemini and return a book-chapter rewrite."""
     from google import genai
     from google.genai import types
     from dotenv import load_dotenv
     load_dotenv()
 
-    # Build a canonical YouTube URL
     video_id = extract_video_id(link)
     youtube_url = f"https://www.youtube.com/watch?v={video_id}"
 
@@ -26,9 +26,6 @@ def get_llm_response(link: str) -> str:
     )
 
     client = genai.Client()
-
-    # Gemini processes the YouTube video directly — no transcript API needed.
-    # This completely bypasses IP blocking issues since Google handles the fetch.
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=[
