@@ -92,7 +92,9 @@ sudo systemctl start textforit
 echo ""
 echo "[5/6] Configuring Nginx..."
 
-sudo bash -c "cat > /etc/nginx/sites-available/textforit << EOF
+# Use sudo tee so the heredoc runs in the current shell (allowing ${PROJECT_DIR}
+# to expand) while nginx variables like $host are safely escaped with backslash.
+sudo tee /etc/nginx/sites-available/textforit > /dev/null << EOF
 server {
     listen 80;
     server_name _;
@@ -113,11 +115,11 @@ server {
         proxy_read_timeout 120s;
     }
 }
-EOF"
+EOF
 
 sudo ln -sf /etc/nginx/sites-available/textforit /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t && sudo systemctl restart nginx
+sudo nginx -t && sudo systemctl enable nginx && sudo systemctl restart nginx
 
 # ── Step 6: Check .env ─────────────────────────────
 echo ""
