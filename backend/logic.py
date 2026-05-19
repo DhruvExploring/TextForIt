@@ -1,20 +1,36 @@
-def get_yt_transcript(link:str) -> str:
+def get_yt_transcript(link: str) -> str:
     from youtube_transcript_api import YouTubeTranscriptApi
-    link=link.split("//")[1]
-    
-    ytt_api = YouTubeTranscriptApi()
-    try:
-        video_id = link.split("=")[1]
-        txt = ytt_api.fetch(video_id).snippets
-    except Exception as e:
-        video_id = link.split("/")[1]
-        video_id = video_id.split("?")[0]
-        txt = ytt_api.fetch(video_id).snippets
-        
-    text=""
-    for i in txt:
-        text+=i.text
-    return text
+    from youtube_transcript_api.proxies import WebshareProxyConfig
+    import os
+
+    # Use Webshare proxy to bypass YouTube's AWS IP block.
+    # Sign up free at https://proxy.webshare.io/ → Proxy → Username/Password
+    # Then set these in backend/.env on your EC2.
+    proxy_username = os.getenv("WEBSHARE_PROXY_USERNAME")
+    proxy_password = os.getenv("WEBSHARE_PROXY_PASSWORD")
+
+    if proxy_username and proxy_password:
+        ytt_api = YouTubeTranscriptApi(
+            proxy_config=WebshareProxyConfig(
+                proxy_username=proxy_username,
+                proxy_password=proxy_password,
+            )
+        )
+    else:
+        ytt_api = YouTubeTranscriptApi()  # works fine in local dev
+
+    # Extract video ID from both youtu.be/ID and youtube.com/watch?v=ID formats
+    path = link.split("//")[-1]          # strip https://
+    if "youtu.be/" in path:
+        video_id = path.split("youtu.be/")[1].split("?")[0]
+    elif "v=" in path:
+        video_id = path.split("v=")[1].split("&")[0]
+    else:
+        raise ValueError(f"Cannot extract video ID from: {link}")
+
+    txt = ytt_api.fetch(video_id).snippets
+    return "".join(i.text for i in txt)
+
 
 def get_llm_response(text:str):
     from google import genai
