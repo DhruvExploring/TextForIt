@@ -57,6 +57,10 @@ fi
 echo "Building for production..."
 npm run build
 
+# Allow Nginx (runs as www-data) to traverse the home directory.
+# Without this, it gets Permission denied (13) even though files are readable.
+sudo chmod o+x /home/ubuntu
+
 cd ..
 
 # ── Step 4: Setup systemd Service ─────────────────
